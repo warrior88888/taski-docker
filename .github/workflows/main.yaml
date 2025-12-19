@@ -33,11 +33,17 @@ jobs:
         pip install -r ./backend/requirements.txt
     - name: Lint with ruff and run django tests
       env:
+        DB_USER: django_user
+        DB_PASS: django_password
+        DB_NAME: django_db
+        DB_HOST: 127.0.0.1
+        DB_PORT: 5432
         POSTGRES_USER: django_user
         POSTGRES_PASSWORD: django_password
         POSTGRES_DB: django_db
-        DB_HOST: 127.0.0.1
-        DB_PORT: 5432
+        DJANGO_SECRET_KEY: test_secret_key
+        SERVER_IP: ${{ secrets.HOST }}
+        SERVER_DOMAIN: octopusvl.duckdns.org
       run: |
         python -m ruff check backend/
         cd backend/
