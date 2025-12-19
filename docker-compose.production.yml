@@ -1,6 +1,6 @@
 volumes:
-  pg_data:
-  static:
+  taski_pg_data:
+  taski_static_value:
 
 services:
   db:
@@ -12,37 +12,37 @@ services:
       POSTGRES_PASSWORD: ${DB_PASS}
       POSTGRES_DB: ${DB_NAME}
     volumes:
-      - pg_data:/var/lib/postgresql/data
+      - taski_pg_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
 
   backend:
-    build: ./backend/
+    image: warrior88888/taski_backend:latest
     restart: always
     env_file: .env
     volumes:
-      - static:/app/collected_static/
+      - taski_static_value:/app/collected_static/
     depends_on:
       db:
         condition: service_healthy
 
   frontend:
-    build: ./frontend/
+    image: warrior88888/taski_frontend:latest
     restart: on-failure
     command: cp -r /app/build/. /frontend_static/
     volumes:
-      - static:/frontend_static
+      - taski_static_value:/frontend_static
 
   gateway:
-    build: ./nginx/
+    image: warrior88888/taski_gateway:latest
     restart: always
     ports:
       - "8000:80"
     volumes:
-      - static:/staticfiles/
+      - taski_static_value:/staticfiles/
     depends_on:
       backend:
         condition: service_started

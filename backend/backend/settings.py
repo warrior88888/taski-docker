@@ -1,16 +1,16 @@
-import os
-
 from pathlib import Path
+
+from .config import settings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+SECRET_KEY = settings.django.SECRET_KEY.get_secret_value()
 
-SECRET_KEY = 'django-insecure-j_89af+30&&4qm*8z9_(^zz8p4-ho8z_m6ylm0s$h!-p@on1_^'
+DEBUG = settings.django.DEBUG
 
-DEBUG = True
+ALLOWED_HOSTS = settings.server.allowed_hosts
 
-ALLOWED_HOSTS = []
-
+CSRF_TRUSTED_ORIGINS = [f'https://{settings.server.DOMAIN}']
 
 # Application definition
 
@@ -63,14 +63,12 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 
 DATABASES = {
     'default': {
-        # Меняем настройку Django: теперь для работы будет использоваться
-        # бэкенд postgresql
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('POSTGRES_DB', 'django'),
-        'USER': os.getenv('POSTGRES_USER', 'django'),
-        'PASSWORD': os.getenv('POSTGRES_PASSWORD', ''),
-        'HOST': os.getenv('DB_HOST', ''),
-        'PORT': os.getenv('DB_PORT', 5432)
+        'NAME': settings.db.NAME,
+        'USER': settings.db.USER,
+        'PASSWORD': settings.db.PASS.get_secret_value(),
+        'HOST': settings.db.HOST.get_secret_value(),
+        'PORT': settings.db.PORT,
     }
 }
 
@@ -119,6 +117,11 @@ STATIC_ROOT = BASE_DIR / 'collected_static'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CORS_ORIGIN_WHITELIST = [
-    'http://localhost:3000'
+# CORS settings
+
+CORS_ALLOWED_ORIGINS = [
+    f'https://{settings.server.DOMAIN}',
+    'http://localhost:3000',
+    'http://localhost:8000',
+    'http://127.0.0.1:3000',
 ]

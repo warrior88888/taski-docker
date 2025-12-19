@@ -8,21 +8,15 @@ on:
 jobs:
   tests:
     runs-on: ubuntu-latest
-    # Блок services аналогичен docker-compose.yml
     services:
       postgres:
         image: postgres:13.10
-        # Указываем имя тестовой базы, имя и пароль пользователя в открытом виде,
-        # ведь эта база будет работать только во время прогона тестов
         env:
           POSTGRES_USER: django_user
           POSTGRES_PASSWORD: django_password
           POSTGRES_DB: django_db
         ports:
           - 5432:5432
-        # Эта конструкция описывает проверку готовности сервиса postgres
-        # Если её не будет, то тесты могут запуститься раньше, чем сервер PostgreSQL
-        # В результате тесты опять решат, что базы нет, — и упадут
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
     - name: Check out code
@@ -37,15 +31,11 @@ jobs:
         python -m pip install --upgrade pip 
         pip install ruff==0.8.0
         pip install -r ./backend/requirements.txt
-    # Этот шаг дополним переменными для доступа к БД
     - name: Lint with ruff and run django tests
-      # Добавляем env-переменные для доступа к БД
       env:
         POSTGRES_USER: django_user
         POSTGRES_PASSWORD: django_password
         POSTGRES_DB: django_db
-        # Сервер БД запущен в Docker, но его порт проброшен на хост
-        # Поэтому подключаемся к 127.0.0.1:5432
         DB_HOST: 127.0.0.1
         DB_PORT: 5432
       run: |
@@ -58,34 +48,19 @@ jobs:
     needs: tests
     steps:
       - name: Check out the repo
-        # Получение исходного кода из репозитория
         uses: actions/checkout@v4
       - name: Set up Docker Buildx
-        # Установка сборщика контейнеров Docker
         uses: docker/setup-buildx-action@v3
       - name: Login to Docker
-        # Авторизация на Docker Hub
         uses: docker/login-action@v3
-        # При помощи with передаём в action параметры username и password
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-          # Хорошо ли держать логин и пароль прямо в коде workflow?
-          # Нет, это нехорошо
       - name: Push to DockerHub
-        # Одновременный билд и пуш образа в Docker Hub
         uses: docker/build-push-action@v5
         with:
-          # Параметр context: ./backend/ указывает, что нужный Dockerfile
-          # находится в ./backend/
           context: ./backend/
-          # Параметр push: true указывает, что образ нужно не только собрать,
-          # но и отправить на Docker Hub
           push: true
-          # В параметре tags задаётся название и тег для образа.
-          # Для каждого пересобранного образа
-          # устанавливаем тег latest, чтобы потом
-          # на сервере и в docker-compose.yml не указывать версию
           tags: warrior88888/taski_backend:latest
   frontend_tests:
       runs-on: ubuntu-latest
@@ -93,18 +68,14 @@ jobs:
       steps:
       - uses: actions/checkout@v4
       - name: Set up nodeJS
-        # Это готовый воркфлоу для установки Node.js на раннер
         uses: actions/setup-node@v4
         with:
-          # Это параметр воркфлоу, указывающий нужную версию Node.js
           node-version: 18
       - name: Install dependencies
-        # Эта команда устанавливает зависимости для фронтенда
         run: |
           cd frontend/
           npm ci
       - name: Test frontend
-        # Запускаем тесты
         run: |
           cd frontend/
           npm run test
@@ -147,12 +118,62 @@ jobs:
           context: ./gateway/
           push: true
           tags: warrior88888/taski_gateway:latest
+  send_build_notification:
+    runs-on: ubuntu-latest
+    needs:
+      - build_and_push_to_docker_hub
+      - build_frontend_and_push_to_docker_hub
+      - build_gateway_and_push_to_docker_hub
+    steps:
+      - name: Send build message
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: Образы Taski успешно собраны и отправлены на Docker Hub!
+  deploy:
+    runs-on: ubuntu-latest
+    needs:
+      - build_and_push_to_docker_hub
+      - build_frontend_and_push_to_docker_hub
+      - build_gateway_and_push_to_docker_hub
+      - send_build_notification
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - name: Copy docker-compose.production.yml via ssh
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          passphrase: ${{ secrets.PASSPHRASE }}
+          source: "docker-compose.production.yml"
+          target: "taski"
+      - name: Executing remote ssh commands to deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          passphrase: ${{ secrets.PASSPHRASE }}
+          script: |
+            cd taski
+            sudo docker compose -f docker-compose.production.yml pull
+            sudo docker compose -f docker-compose.production.yml up -d
+            sudo docker image prune -af
+      - name: Verify Domain Accessibility
+        run: |
+          echo "Waiting for services to settle..."
+          sleep 15
+          curl -f https://octopusvl.duckdns.org/api/tasks/ || { echo "Domain is unreachable!"; exit 1; }
   send_message:
       runs-on: ubuntu-latest
       needs:
         - build_and_push_to_docker_hub
         - build_frontend_and_push_to_docker_hub
         - build_gateway_and_push_to_docker_hub
+        - deploy
       steps:
         - name: Send message
           uses: appleboy/telegram-action@master
