@@ -42,6 +42,7 @@ jobs:
         POSTGRES_PASSWORD: django_password
         POSTGRES_DB: django_db
         DJANGO_SECRET_KEY: test_secret_key
+        DJANGO_DEBUG: True
         SERVER_IP: ${{ secrets.HOST }}
         SERVER_DOMAIN: octopusvl.duckdns.org
       run: |
