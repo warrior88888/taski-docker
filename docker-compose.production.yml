@@ -1,50 +1,93 @@
-volumes:
-  taski_pg_data:
-  taski_static_value:
-
 services:
-  db:
-    image: postgres:13
-    restart: always
-    env_file: .env
+  taski_postgres:
+    image: postgres:17.8-alpine3.23
+    container_name: taski_postgres_container
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASS}
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${TI__POSTGRES__USER}
+      POSTGRES_PASSWORD: ${TI__POSTGRES__PASSWORD}
+      POSTGRES_DB: ${TI__POSTGRES__DB}
+    networks:
+      - postgres_network
     volumes:
-      - taski_pg_data:/var/lib/postgresql/data
+      - pg_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    command: >
+      postgres
+      -c max_connections=20
+      -c shared_buffers=128MB
+      -c work_mem=4MB
+      -c maintenance_work_mem=32MB
+      -c effective_cache_size=384MB
+      -c wal_buffers=4MB
+      -c checkpoint_completion_target=0.9
+      -c random_page_cost=1.1
+    stop_grace_period: 30s
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
 
-  backend:
-    image: warrior88888/taski_backend:latest
-    restart: always
-    env_file: .env
+  taski_backend:
+    image: warrior88888/taski_backend
+    container_name: taski_backend
+    env_file:
+      - .env
+    environment:
+      TI__DJANGO__DEBUG: "False"
+      TI__POSTGRES__HOST: "taski_postgres"
+    networks:
+      - backend_network
+      - postgres_network
     volumes:
-      - taski_static_value:/app/collected_static/
+      - static:/app/collected_static/
+      - media:/app/media/
     depends_on:
-      db:
+      taski_postgres:
         condition: service_healthy
+    restart: unless-stopped
 
   frontend:
-    image: warrior88888/taski_frontend:latest
+    image: warrior88888/taski_frontend
     restart: on-failure
-    command: cp -r /app/build/. /frontend_static/
     volumes:
-      - taski_static_value:/frontend_static
+      - frontend_static:/frontend_static
 
-  gateway:
-    image: warrior88888/taski_gateway:latest
-    restart: always
-    ports:
-      - "8000:80"
+  taski_gateway:
+    image: warrior88888/taski_gateway
+    environment:
+      ADMIN_URL: ${TI__DJANGO__ADMIN_PATH}
+    restart: unless-stopped
+    networks:
+      - backend_network
+      - proxy_network
     volumes:
-      - taski_static_value:/staticfiles/
+      - static:/staticfiles/
+      - frontend_static:/frontend/
+      - media:/media/
     depends_on:
-      backend:
+      taski_backend:
         condition: service_started
       frontend:
         condition: service_completed_successfully
+
+networks:
+  postgres_network:
+    internal: true
+  backend_network:
+    internal: true
+  proxy_network:
+    external: true
+
+volumes:
+  pg_data:
+  static:
+  frontend_static:
+  media:
