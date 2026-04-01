@@ -126,7 +126,6 @@ jobs:
             TI__DJANGO__DOMAIN=${{ secrets.TI__DJANGO__DOMAIN }}
             TI__DJANGO__HEALTHCHECK_PATH=${{ secrets.TI__DJANGO__HEALTHCHECK_PATH }}
             TI__DJANGO__ADMIN_PATH=${{ secrets.TI__DJANGO__ADMIN_PATH }}
-            TI__POSTGRES__HOST=${{ secrets.TI__POSTGRES__HOST }}
             TI__POSTGRES__DB=${{ secrets.TI__POSTGRES__DB }}
             TI__POSTGRES__USER=${{ secrets.TI__POSTGRES__USER }}
             TI__POSTGRES__PASSWORD=${{ secrets.TI__POSTGRES__PASSWORD }}
