@@ -17,7 +17,6 @@ urlpatterns = [
             checks=[
                 "health_check.Database",
                 "health_check.Storage",
-                "health_check.Cache",
             ]
         ),
         name="health_check",
