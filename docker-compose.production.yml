@@ -62,6 +62,7 @@ services:
 
   taski_gateway:
     image: warrior88888/taski_gateway
+    container_name: taski_gateway
     environment:
       ADMIN_URL: ${TI__DJANGO__ADMIN_PATH}
     restart: unless-stopped
