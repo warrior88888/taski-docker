@@ -13,12 +13,7 @@ urlpatterns = [
     path(app_config.django.admin_path, admin.site.urls),
     path(
         app_config.django.healthcheck_path,
-        HealthCheckView.as_view(
-            checks=[
-                "health_check.Database",
-                "health_check.Storage",
-            ]
-        ),
+        HealthCheckView.as_view(checks=["health_check.Database"]),
         name="health_check",
     ),
     path("api/", include(router.urls)),
